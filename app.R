@@ -63,6 +63,36 @@ prism_blocks <- function(pl) {
   out
 }
 
+# Save a ggplot as PNG/PDF. In the browser (webR) large 300-dpi bitmaps can fail
+# or come out empty, so PNG export retries with a plain grDevices::png() device and
+# then at a lower resolution. Returns the dpi actually used (NA for PDF); stops with
+# a readable message if nothing worked.
+save_plot <- function(file, plot, w, h, fmt = c("png", "pdf"), dpi = 300) {
+  fmt <- match.arg(fmt)
+  good <- function() file.exists(file) && isTRUE(file.size(file) > 1000)
+  if (fmt == "pdf") {
+    ggsave(file, plot, device = "pdf", width = w, height = h)
+    if (!good()) stop("PDF export produced an empty file.")
+    return(invisible(NA_real_))
+  }
+  via_ggsave <- function(d) {
+    ggsave(file, plot, device = "png", dpi = d, width = w, height = h, bg = "white")
+  }
+  via_device <- function(d) {
+    grDevices::png(file, width = w, height = h, units = "in", res = d, bg = "white")
+    on.exit(grDevices::dev.off(), add = TRUE)
+    print(plot)
+  }
+  for (d in unique(c(dpi, min(dpi, 150), 96))) {
+    for (f in list(via_ggsave, via_device)) {
+      if (file.exists(file)) unlink(file)
+      ok <- tryCatch({ f(d); good() }, error = function(e) FALSE, warning = function(w) good())
+      if (ok) return(invisible(d))
+    }
+  }
+  stop("PNG export failed in this browser. Try the PDF button, or a smaller width/height.")
+}
+
 `%||%` <- function(a, b) if (is.null(a) || !length(a) || is.na(a[1])) b else a
 
 # ------------------------------------------------------------------------------
@@ -384,9 +414,11 @@ ui <- fluidPage(
       selectInput("theme", "Theme", theme_choices),
       numericInput("base_size", "Font size", 13, min = 8, max = 24),
       fluidRow(
-        column(6, numericInput("dl_w", "Kinetic export width (in)", 8, min = 2)),
-        column(6, numericInput("dl_h", "height (in)", 5, min = 2))
-      )
+        column(6, numericInput("dl_w", "Kinetic export width (in)", 8, min = 2, max = 20)),
+        column(6, numericInput("dl_h", "height (in)", 5, min = 2, max = 20))
+      ),
+      numericInput("dl_dpi", "PNG resolution (dpi)", if (in_webr) 150 else 300,
+                   min = 72, max = 600, step = 50)
     ),
 
     mainPanel(
@@ -871,14 +903,35 @@ server <- function(input, output, session) {
   # ---- downloads ---------------------------------------------------------------
   tag <- reactive(paste0("seahorse_", input$assay))
 
+  png_dpi <- reactive({
+    d <- suppressWarnings(as.numeric(input$dl_dpi))
+    if (length(d) != 1 || is.na(d)) 150 else min(max(d, 72), 600)
+  })
+  dl_size <- function() {
+    w <- suppressWarnings(as.numeric(input$dl_w)); h <- suppressWarnings(as.numeric(input$dl_h))
+    list(w = if (length(w) != 1 || is.na(w)) 8 else min(max(w, 2), 20),
+         h = if (length(h) != 1 || is.na(h)) 5 else min(max(h, 2), 20))
+  }
+  run_save <- function(file, plot, w, h, fmt, dpi = 300) {
+    tryCatch({
+      used <- save_plot(file, plot, w, h, fmt, dpi)
+      if (!is.na(used) && used < dpi)
+        showNotification(sprintf("PNG saved at %d dpi (%d dpi failed in this browser).",
+                                 as.integer(used), as.integer(dpi)), type = "warning", duration = 8)
+    }, error = function(e) {
+      showNotification(conditionMessage(e), type = "error", duration = NULL)
+      stop(e)
+    })
+  }
+
   output$dl_kin_png <- downloadHandler(
     filename = function() paste0(tag(), "_kinetic.png"),
-    content = function(file) ggsave(file, kin_plot(), device = "png", dpi = 300,
-                                    width = input$dl_w, height = input$dl_h))
+    content = function(file) { z <- dl_size()
+      run_save(file, kin_plot(), z$w, z$h, "png", png_dpi()) })
   output$dl_kin_pdf <- downloadHandler(
     filename = function() paste0(tag(), "_kinetic.pdf"),
-    content = function(file) ggsave(file, kin_plot(), device = "pdf",
-                                    width = input$dl_w, height = input$dl_h))
+    content = function(file) { z <- dl_size()
+      run_save(file, kin_plot(), z$w, z$h, "pdf") })
   output$dl_kin_csv <- downloadHandler(
     filename = function() paste0(tag(), "_kinetic_group_means.csv"),
     content = function(file) utils::write.csv(
@@ -887,11 +940,11 @@ server <- function(input, output, session) {
   output$dl_par_png <- downloadHandler(
     filename = function() paste0(tag(), "_parameters.png"),
     content = function(file) { z <- par_dims()
-      ggsave(file, par_plot(), device = "png", dpi = 300, width = z$w, height = z$h) })
+      run_save(file, par_plot(), z$w, z$h, "png", png_dpi()) })
   output$dl_par_pdf <- downloadHandler(
     filename = function() paste0(tag(), "_parameters.pdf"),
     content = function(file) { z <- par_dims()
-      ggsave(file, par_plot(), device = "pdf", width = z$w, height = z$h) })
+      run_save(file, par_plot(), z$w, z$h, "pdf") })
 
   output$dl_wells <- downloadHandler(
     filename = function() paste0(tag(), "_per_well_parameters.csv"),
