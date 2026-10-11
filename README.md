@@ -35,10 +35,32 @@ README.md
    instead, use *Add file > Create new file*, type `.github/workflows/deploy.yml` as the name and
    paste the file contents.
 3. **Switch on Pages from Actions.** Repo *Settings > Pages > Build and deployment > Source:
-   GitHub Actions*. (Do this before, or immediately after, the first push; the first deploy fails
-   if Pages is not enabled. If it already failed, re-run it from the Actions tab.)
+   GitHub Actions*. This only tells GitHub *how* to publish; **nothing is published until the
+   workflow runs successfully on `main`.** If the workflow already ran (and failed) before you did
+   this, re-run it: *Actions > the failed run > Re-run all jobs*, or *Actions > Deploy app to GitHub
+   Pages > Run workflow*.
 4. **Wait for the build.** *Actions* tab > "Deploy app to GitHub Pages". The first run takes a few
-   minutes. When both jobs are green the app is live at the URL above (also shown on the deploy job).
+   minutes. There are two jobs, `build` and `deploy`; the `deploy` job only runs for pushes to `main`
+   (it is skipped on pull requests). When both are green the app is live at the URL above (also shown
+   on the deploy job).
+
+## If the deploy does not work
+
+Open the failed run in the *Actions* tab and read the red step. The usual causes:
+
+- **Default branch is not `main`** (e.g. `master`). The workflow and the deploy job are tied to `main`.
+  Rename the branch (`git branch -M main && git push -u origin main`) or change the branch name in
+  `.github/workflows/deploy.yml`.
+- **Environment rule blocks the branch.** *Settings > Environments > github-pages > Deployment
+  branches and tags* must allow `main`. GitHub creates this environment automatically when you pick
+  GitHub Actions as the source, restricted to the default branch.
+- **Actions are restricted.** *Settings > Actions > General*: actions and reusable workflows must be
+  allowed to run. In an organisation, the policy must permit `posit-dev/r-shinylive` and the
+  `actions/*` actions.
+- **Pages not enabled yet** (an error mentioning "Pages site" or "Not Found"): do step 3, then re-run.
+- **Private repo on a free account:** Pages is unavailable; make the repo public.
+- **The `build` job fails:** the log shows which R package could not be installed or exported;
+  send that message on for a fix.
 
 ## Updating the app
 
