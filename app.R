@@ -22,6 +22,16 @@ library(DT)
 
 options(shiny.maxRequestSize = 50 * 1024^2)
 
+# Workaround for Chromium issue 468227: in shinylive, Chrome saves downloads as
+# "download.html" ("File wasn't available on site") when the button's <a> tag has a
+# `download` attribute. Dropping the attribute makes the browser use the filename
+# the app supplies instead. Harmless in desktop R.
+downloadButton <- function(...) {
+  tag <- shiny::downloadButton(...)
+  tag$attribs$download <- NULL
+  tag
+}
+
 in_webr <- grepl("emscripten", R.version$os)
 
 # ggprism / pzfx are optional and are looked up at run time (package names are
