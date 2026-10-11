@@ -8,7 +8,7 @@ It is deployed with [shinylive](https://posit-dev.github.io/r-shinylive/), so it
 your browser** (R is compiled to WebAssembly). There is no server, and uploaded data never leaves
 your computer.
 
-**Live app:** `[https://<your-github-username>.github.io/<repo-name>/](https://sarahehancock.github.io/seahorse-analyser/)`
+**Live app:** `https://sarahehancock.github.io/seahorse-analyser/`
 
 ## Repository layout
 
