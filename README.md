@@ -2,7 +2,7 @@
 
 A Shiny app that reads a Seahorse Wave export (`.xlsx`, "Rate" or "Normalized Rate" sheet, or an
 equivalent `.csv`), calculates the Mito Stress Test and Glycolysis Stress Test parameters per well,
-and plots/exports them. It supports plates where half the wells ran Mito and half ran Glyco.
+and plots/exports them. It supports plates where half the wells ran a Mito Stress Test and half ran Glyco Stress Test (provided the sample wells are labelled with "Mito" and "Glyco" respectively).
 
 It is deployed with [shinylive](https://posit-dev.github.io/r-shinylive/), so it runs **entirely in
 your browser** (R is compiled to WebAssembly). There is no server, and uploaded data never leaves
